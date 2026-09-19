@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/zhiguang?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:local-dev-password}
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:123456}
+      database: ${SPRING_DATA_REDIS_DATABASE:2}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:29092}
+  elasticsearch:
+    uris:
+      - ${SPRING_ELASTICSEARCH_URIS:http://elasticsearch:9200}
+
+canal:
+  host: ${CANAL_HOST:canal}
+  port: ${CANAL_PORT:11111}
+  username: ${CANAL_USERNAME:canal}
+  password: ${CANAL_PASSWORD:local-dev-password}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

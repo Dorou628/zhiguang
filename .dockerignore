@@ -1,0 +1,13 @@
+.git
+.idea
+.vscode
+target
+Record
+*.iml
+
+.local
+.env
+.env.*
+**/*.pem
+frontend/node_modules
+frontend/dist
