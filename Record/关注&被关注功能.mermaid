@@ -1,0 +1,38 @@
+sequenceDiagram
+    participant App as 👤 应用服务
+    participant DB as MySQL 数据库<br/>zhiguang.outbox
+    participant Canal as Canal Server<br/>日志订阅
+    participant Bridge as CanalKafkaBridge<br/>本组件
+    participant Kafka as Kafka Topic<br/>canal-outbox
+    participant Consumer as 下游消费者
+
+    Note over App,Consumer: 阶段一：写入数据库
+    
+    App->>DB: 插入 outbox 表<br/>INSERT INTO outbox (payload, ...) <br/>VALUES ('{"userId":123,"type":"follow"}', ...)
+    Note over DB: ✅ 事务提交<br/>binlog 记录变更
+    
+    Note over App,Consumer: 阶段二：Canal 捕获（毫秒级）
+    
+    Canal->>DB: 订阅 binlog
+    DB-->>Canal: 推送 INSERT 事件
+    
+    Note over App,Consumer: 阶段三：桥接器转发
+    
+    Bridge->>Canal: 轮询拉取消息<br/>getWithoutAck(1000)
+    Canal-->>Bridge: 返回一批变更事件
+    
+    loop 处理每条记录
+        Bridge->>Bridge: 解析 RowChange
+        Bridge->>Bridge: 提取 payload 字段
+        Bridge->>Bridge: 组装 JSON 消息
+    end
+    
+    Bridge->>Kafka: 发送到 canal-outbox 主题
+    
+    Bridge->>Canal: 确认位点<br/>ack(batchId)
+    Note over Canal: ✅ 标记已消费
+    
+    Note over App,Consumer: 阶段四：下游消费
+    
+    Kafka-->>Consumer: 推送消息
+    Consumer->>Consumer: 更新粉丝数/关注数

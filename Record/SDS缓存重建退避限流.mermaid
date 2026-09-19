@@ -1,0 +1,47 @@
+sequenceDiagram
+    participant User as 👤 用户查询
+    participant API as getCounts
+    participant Backoff as 退避检查
+    participant RateLimit as 限流器
+    participant Lock as 分布式锁
+    participant Rebuild as 重建逻辑
+
+    User->>API: 请求计数
+    API->>API: 读取 SDS
+    Note over API: SDS 不存在<br/>needRebuild=true
+
+    API->>Backoff: inBackoff?
+    
+    alt 正在退避期
+        Backoff-->>API: true
+        API-->>User: 返回 0<br/>(降级结果)
+        Note over API,Backoff: 保护机制生效<br/>避免重建风暴
+    else 不在退避期
+        Backoff-->>API: false
+        
+        API->>RateLimit: tryAcquire?
+        
+        alt 超过限流
+            RateLimit-->>API: false
+            API->>Backoff: escalateBackoff<br/>(升级退避级别)
+            API-->>User: 返回 0
+        else 允许通过
+            RateLimit-->>API: true
+            
+            API->>Lock: tryLock?
+            
+            alt 获取锁失败
+                Lock-->>API: false
+                API->>Backoff: escalateBackoff
+                API-->>User: 返回 0
+            else 获取锁成功
+                Lock-->>API: true
+                API->>Rebuild: 从 Bitmap 重建
+                Rebuild-->>API: 成功
+                
+                API->>Backoff: resetBackoff<br/>(重置为正常状态)
+                API->>Lock: unlock
+                API-->>User: 返回真实计数
+            end
+        end
+    end

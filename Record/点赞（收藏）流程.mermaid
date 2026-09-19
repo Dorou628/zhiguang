@@ -1,0 +1,31 @@
+graph TB
+    User[👤 用户点赞] -->|调用 | Toggle[toggle 方法]
+    Toggle -->|执行 | Lua[Lua 脚本<br/>toggleScript]
+    Lua -->|原子更新 | BM[Bitmap<br/>bm:like:knowpost:123:0]
+    
+    BM -->|状态变化成功？| Check{ok?}
+    Check -->|是 | SendEvents[发送两个事件]
+    
+    SendEvents -->|🔴 Kafka 事件 | Kafka[(Kafka Topic<br/>counter.events)]
+    SendEvents -->|🔵 Spring 事件 | SpringBus[Spring 本地事件总线]
+    
+    Kafka -->|消费 | AggConsumer[聚合消费者<br/>CounterAggregationConsumer]
+    AggConsumer -->|写入 | Hash[Hash 聚合桶<br/>agg:v1:knowpost:123]
+    Hash -->|定时刷写 | Timer[flush 任务<br/>每秒]
+    Timer -->|更新 | SDS[SDS 计数<br/>cnt:v1:knowpost:123]
+    
+    SpringBus -->|监听 | CacheListener[缓存监听器]
+    SpringBus -->|监听 | NotifyListener[通知监听器]
+    
+    CacheListener -->|清除 | LocalCache[本地缓存<br/>Caffeine]
+    CacheListener -->|清除 | RedisCache[Redis 缓存<br/>knowpost:detail:123]
+    
+    SDS -->|查询 | Query[用户查询详情]
+    LocalCache -.加速.-> Query
+    
+    style BM fill:#e1f5ff
+    style Kafka fill:#f8d7da
+    style Hash fill:#fff3cd
+    style SDS fill:#d4edda
+    style SpringBus fill:#d5e8d4
+    style Lua fill:#ffe6cc

@@ -1,0 +1,33 @@
+sequenceDiagram
+    participant Client as 客户端
+    participant Server as 后端服务器
+    participant OSS as OSS 存储
+    participant DB as MySQL 数据库
+
+    Note over Client,DB: 阶段 1: 申请上传权限
+    Client->>Server: 1. POST /storage/presign<br/>(带 JWT + postId)
+    Server->>DB: 2. 验证帖子归属权
+    DB-->>Server: 3. 返回验证结果
+    Server->>Server: 4. 生成预签名 URL<br/>(使用 OSS 密钥)
+    Server-->>Client: 5. 返回 putUrl + objectKey
+
+    Note over Client,DB: 阶段 2: 直接上传 OSS
+    Client->>OSS: 6. PUT /objectKey<br/>(使用预签名 URL)
+    OSS->>OSS: 7. 验证签名和权限
+    OSS-->>Client: 8. 200 OK + ETag
+
+    Note over Client,DB: 阶段 3: 回告后端确认
+    Client->>Server: 9. POST /confirm<br/>(objectKey + etag + size)
+    Server->>DB: 10. 写入文件引用信息
+    DB-->>Server: 11. 保存成功
+    Server-->>Client: 12. 204 No Content
+
+    Note over Client,DB: 阶段 4: 后续访问
+    Client->>Server: 13. GET /knowposts/{id}
+    Server->>DB: 14. 查询元数据 + OSS URL
+    DB-->>Server: 15. 返回记录
+    Server-->>Client: 16. 返回详情 (含 OSS 地址)
+    
+    Note over Client,DB: 阶段 5: 查看内容
+    Client->>OSS: 17. GET /objectKey<br/>(直接访问公开 URL)
+    OSS-->>Client: 18. 返回文件内容

@@ -1,0 +1,25 @@
+sequenceDiagram
+    participant Client as 客户端
+    participant API as 业务接口
+    participant Auth as 认证服务
+    participant Redis as Redis 白名单
+
+    Note over Client,Redis: 阶段 1: 登录
+    Client->>Auth: 账号密码
+    Auth-->>Client: Access Token + Refresh Token
+
+    Note over Client,Redis: 阶段 2: 访问业务 API
+    loop 每次请求
+        Client->>API: 请求 + Access Token
+        API->>API: 验证 Access Token 签名<br/>检查过期时间
+        API-->>Client: 返回数据
+    end
+
+    Note over Client,Redis: 阶段 3: Access Token 过期后刷新
+    Client->>Auth: Refresh Token
+    Auth->>Auth: 验证 Refresh Token 签名
+    Auth->>Redis: 检查白名单是否存在
+    Redis-->>Auth: 存在
+    Auth->>Auth: 签发新令牌对
+    Auth->>Redis: 撤销旧 Refresh Token<br/>存储新 Refresh Token
+    Auth-->>Client: 新 Access Token + Refresh Token

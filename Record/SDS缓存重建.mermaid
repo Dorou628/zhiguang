@@ -1,0 +1,43 @@
+sequenceDiagram
+    participant User as 👤 用户查询
+    participant API as getCounts 方法
+    participant Check1 as 退避检查
+    participant RateLimit as 限流器
+    participant Lock as Redisson 分布式锁
+    participant Bitmap as Bitmap 分片
+    participant HashHash 聚合桶
+    participant SDS as SDS 计数
+
+    User->>API: 请求知文 123 的计数
+    API->>API: 读取 SDS
+    Note over API: SDS 不存在或损坏<br/>needRebuild = true
+
+    API->>Check1: inBackoff?
+    Check1-->>API: false (不在退避期)
+
+    API->>RateLimit: tryAcquire(1)
+    RateLimit-->>API: true (允许重建)
+
+    API->>Lock: tryLock(0ms)
+    Lock-->>API: true (获得锁)
+
+    loop 对每个指标 (like, fav)
+        API->>Bitmap: bitCountShardsPipelined()
+        Note over Bitmap: 扫描所有分片<br/>bm:like:knowpost:123:*
+        Bitmap-->>API: 返回总和<br/>like=1000, fav=500
+    end
+
+    API->>API: 组装新 SDS<br/>20 字节二进制串
+    API->>SDS: setRaw(cntKey, newSds)
+    Note over SDS: ✅ SDS 重建完成
+
+    API->>Hash: delete(aggKey, ["1", "2"])
+    Note over Hash: 清理聚合桶<br/>避免重复加算
+
+    API->>Check1: resetBackoff()
+    Note over Check1: 重置退避状态
+
+    API->>Lock: unlock()
+    Lock-->>API: 释放锁
+
+    API-->>User: 返回计数<br/>{like=1000, fav=500}

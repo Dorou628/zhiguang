@@ -1,0 +1,50 @@
+graph TB
+    Start[👤 用户请求知文详情] --> Step0[0️⃣ L1 本地缓存查询<br/>Caffeine]
+    
+    Step0 --> Check0{L1 命中？}
+    Check0 -->|是 | Record0[记录热度并延长 TTL]
+    Record0 --> Enrich0[叠加实时计数和用户状态]
+    Enrich0 --> Return0[✅ 返回结果<br/>耗时~0.01ms]
+    
+    Check0 -->|否 | Step1[1️⃣ L2 Redis 缓存查询]
+    Step1 --> Check1{L2 命中？}
+    Check1 -->|是 | ProcessHit[解析缓存 + 填充 L1]
+    ProcessHit --> Record1[记录热度并延长 TTL]
+    Record1 --> Enrich1[叠加实时计数和用户状态]
+    Enrich1 --> Return1[✅ 返回结果<br/>耗时~1ms]
+    
+    Check1 -->|否 | Step2[2️⃣ SingleFlight 锁机制]
+    Step2 --> Lock[获取分布式锁]
+    Lock --> DoubleCheck[3️⃣ 双重检查 Redis]
+    DoubleCheck --> CheckDC{命中？}
+    CheckDC -->|是 | Return2[✅ 直接返回<br/>其他线程已填充]
+    
+    CheckDC -->|否 | Step3[4️⃣ 数据库回源查询]
+    Step3 --> CheckExist{存在吗？}
+    CheckExist -->|不存在 | WriteNull[写入 NULL 空值缓存]
+    WriteNull --> ThrowNull[❌ 抛出异常<br/>防止缓存穿透]
+    
+    CheckExist -->|存在 | CheckPerm{权限校验}
+    CheckPerm -->|无权限 | ThrowPerm[❌ 抛出异常]
+    
+    CheckPerm -->|有权限 | Assemble[5️⃣ 组装响应对象]
+    Assemble --> QueryCount[查询 SDS 计数]
+    QueryCount --> BuildResp[构建 KnowPostDetailResponse]
+    
+    BuildResp --> WriteCache[6️⃣ 写入双缓存]
+    WriteCache --> WriteRedis[写入 Redis + 随机 TTL]
+    WriteRedis --> WriteL1[填充 Caffeine]
+    
+    WriteL1 --> FinalEnrich[7️⃣ 叠加用户状态]
+    FinalEnrich --> ReleaseLock[释放锁]
+    ReleaseLock --> Return3[✅ 返回结果<br/>耗时~10ms]
+    
+    style Step0 fill:#ffe6cc
+    style Step1 fill:#fff3cd
+    style Step2 fill:#f8d7da
+    style Step3 fill:#d1ecf1
+    style WriteCache fill:#d4edda
+    style Return0 fill:#c3e6cb
+    style Return1 fill:#c3e6cb
+    style Return2 fill:#c3e6cb
+    style Return3 fill:#c3e6cb

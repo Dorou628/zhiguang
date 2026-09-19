@@ -1,0 +1,27 @@
+sequenceDiagram
+    participant Admin as 管理员
+    participant K as Kafka
+    participant RC as 重建消费者<br/>(counter-rebuild)
+    participant S as SDS 计数
+
+    Note over K,S: 灾难场景：SDS 数据全部丢失
+    
+    Admin->>Admin: 发现故障<br/>SDS 计数全为 0
+    
+    Admin->>Config: 手动开启开关<br/>counter.rebuild.enabled=true
+    
+    Config->>RC: 启动重建消费者
+    
+    Note over K,RC: auto.offset.reset=earliest<br/>从最早消息开始回放
+    
+    K->>RC: 回放历史事件<br/>(可能是半年前的)
+    
+    loop 持续消费直到追上最新位点
+        RC->>S: Lua 脚本直接更新 SDS<br/>跳过 Hash 聚合层
+        
+        Note over S: cnt:v1:knowpost:123<br/>+= delta<br/>逐条累加
+    end
+    
+    Admin->>Config: 重建完成后关闭开关<br/>counter.rebuild.enabled=false
+    
+    Note over K,S: ✅ 计数恢复到灾前状态

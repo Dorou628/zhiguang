@@ -1,0 +1,35 @@
+sequenceDiagram
+    participant U as 用户
+    participant API as 接口服务
+    participant BM as Bitmap 事实层
+    participant K as Kafka
+    participant AGG as 聚合层 Hash
+    participant SDS as SDS 计数层
+
+    Note over U,SDS: 阶段一：同步点赞（<10ms）
+    U->>API: 点击点赞
+    API->>BM: Lua 脚本原子置位
+    Note right of BM: bm:like:knowpost:123:1<br/>SETBIT offset 17232 1
+    BM-->>API: 返回成功（状态变化）
+    API->>K: 发布增量事件<br/>{etype:knowpost, eid:123,<br/>metric:like, idx:1, delta:+1}
+    API-->>U: 返回点赞成功
+
+    Note over U,SDS: 阶段二：异步聚合（毫秒级）
+    K->>AGG: 消费者监听事件
+    AGG->>AGG: Hash.increment<br/>field="1", value=+1
+    Note right of AGG: agg:v1:knowpost:123<br/>{"1": 150}
+
+    Note over U,SDS: 阶段三：定时刷写（1 秒延迟）
+    loop 每秒执行
+        AGG->>SDS: Lua 脚本原子更新
+        Note right of SDS: cnt:v1:knowpost:123<br/>idx1 += 150
+        AGG->>AGG: 删除已处理字段
+    end
+
+    Note over U,SDS: 查询操作（实时）
+    U->>API: 请求详情
+    API->>SDS: GET 读取计数
+    SDS-->>API: 返回 20 字节二进制串
+    API->>BM: GETBIT 判断用户状态
+    BM-->>API: 返回 0/1
+    API-->>U: 返回计数 + 状态

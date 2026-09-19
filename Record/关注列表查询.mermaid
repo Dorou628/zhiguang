@@ -1,0 +1,33 @@
+sequenceDiagram
+    participant API as 👤 API 请求
+    participant Redis as Redis ZSet<br/>uf:flws:1
+    participant Local as Caffeine 本地缓存
+    participant DB as MySQL<br/>relation 表
+
+    API->>Redis: ZREVRANGE key 40 59
+    Note over Redis: 检查缓存是否存在
+    
+    alt 缓存命中
+        Redis-->>API: 返回 [41, 42, ..., 60]
+        Note over API: ✅ 耗时~1ms
+    else 缓存未命中
+        Redis-->>API: null
+        
+        API->>Local: get(userId=1)
+        
+        alt 本地缓存命中
+            Local-->>API: 返回前 100 个<br/>取 sublist(40, 60)
+            Note over API: ✅ 耗时~0.01ms（大 V 专属）
+        else 本地也未命中
+            Local-->>API: null
+            
+            API->>DB: SELECT to_user_id FROM relation <br/>WHERE from_user_id=1 <br/>ORDER BY created_at DESC <br/>LIMIT 60
+            DB-->>API: 返回 60 条记录
+            
+            API->>Redis: ZADD key score member<br/>（回填缓存）
+            Redis->>Redis: EXPIRE 7200s
+            
+            API->>API: 返回第 40-59 条
+            Note over API: ❌ 耗时~10ms
+        end
+    end

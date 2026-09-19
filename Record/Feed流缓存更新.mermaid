@@ -1,0 +1,63 @@
+sequenceDiagram
+    participant User as 👤 用户点赞
+    participant Event as Spring 事件
+    participant Listener as FeedCacheInvalidationListener
+    participant Redis as Redis 缓存
+    participant Local as Caffeine 本地缓存
+
+    User->>Event: 点赞知文 26
+    Event->>Listener: onCounterEvent(event)
+    
+    Note over Listener: 1️⃣ 事件过滤
+    Listener->>Listener: entityType="knowpost"?<br/>metric="like" or "fav"?
+    
+    alt 是知文的点赞/收藏事件
+        Note over Listener: 2️⃣ 更新作者维度计数
+        Listener->>Redis: ucnt:作者 A [likesReceived += 1]
+        
+        Note over Listener: 3️⃣ 计算时间窗口
+        Listener->>Listener: hourSlot = now / 3600000
+        
+        Note over Listener: 4️⃣ 查询反向索引
+        Listener->>Redis: 查询 feed:public:index:26:hourSlot<br/>(当前小时)
+        Redis-->>Listener: 返回当前小时的页面 Keys
+        
+        Listener->>Redis: 查询 feed:public:index:26:(hourSlot-1)<br/>(上一小时)
+        Redis-->>Listener: 返回上一小时的页面 Keys
+        
+        Note over Listener: 5️⃣ 合并去重
+        Listener->>Listener: LinkedHashSet 合并两个小时的 Keys
+        
+        alt 没有受影响的页面
+            Listener->>Listener: 直接返回
+        else 有受影响的页面
+            loop 每个页面 Key
+                Note over Listener: 6️⃣ 更新 Caffeine 本地缓存
+                Listener->>Local: getIfPresent(key)
+                Local-->>Listener: 返回缓存对象
+                
+                Listener->>Listener: adjustPageCounts(..., true)
+                Listener->>Local: put(key, updated)
+                
+                Note over Listener: 7️⃣ 更新 Redis 缓存
+                Listener->>Redis: get(key)
+                Redis-->>Listener: 返回 JSON 字符串
+                
+                Listener->>Listener: readValue(JSON)
+                Listener->>Listener: adjustPageCounts(..., false)
+                Listener->>Redis: writePageJsonKeepingTtl(key, updated)
+                
+                Note over Redis: 保持原有 TTL<br/>不重置过期时间
+            end
+            
+            Note over Listener: 8️⃣ 清理失效索引
+            Listener->>Redis: 检查页面是否已过期
+            alt 页面已过期
+                Listener->>Redis: remove(indexKey, pageKey)
+            end
+        end
+    else 不是关心事件
+        Listener->>Listener: 忽略
+    end
+    
+    Note over Listener: ✅ 完成！所有相关页面的计数都已同步
