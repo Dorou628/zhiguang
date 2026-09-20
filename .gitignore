@@ -48,3 +48,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 *.log
+
+# One-click private configuration
+.local/
+!.env.example

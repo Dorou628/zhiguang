@@ -1,5 +1,9 @@
 # 知光 · 知识分享社区
 
+## 一键启动
+
+安装 Docker Desktop 后双击根目录 **`start.cmd`**，等待 `Ready`，打开 http://127.0.0.1:15173 。演示登录：`demo@example.com` / `DemoPass123!`。停止双击 `stop.cmd`，数据会保留。首次启动、可选 API 密钥与排障见 [一键启动说明](ONE-CLICK.md)。
+
 Java 21 / Spring Boot 后端与 React / Vite 前端的学习实践仓库。后端位于根目录，前端位于 `frontend/`。
 
 本仓库导入已有本地代码并按模块组织提交。来源为 [G-Pegasus/zhiguang_be](https://github.com/G-Pegasus/zhiguang_be) 和 [G-Pegasus/zhiguang_fe](https://github.com/G-Pegasus/zhiguang_fe)；原始说明保存在 [上游 README](docs/upstream-readme.md)。导入提交用于梳理代码结构，不代表这些模块在提交当天从零开发。此次整理补充了环境变量配置、密钥隔离和可移植的容器路径。
