@@ -15,6 +15,8 @@ const LoginPage = () => {
   const { login, isLoading, user } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginMode, setLoginMode] = useState<"password" | "code">("password");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
@@ -40,7 +42,9 @@ const LoginPage = () => {
     setSubmitting(true);
 
     try {
-      const payload: LoginRequest = { identifierType: "PHONE", identifier, code };
+      const payload: LoginRequest = loginMode === "password"
+        ? { identifierType: identifier.includes("@") ? "EMAIL" : "PHONE", identifier: identifier.trim(), password }
+        : { identifierType: "PHONE", identifier: identifier.trim(), code };
       await login(payload);
       navigate(from, { replace: true });
     } catch (err) {
@@ -73,7 +77,7 @@ const LoginPage = () => {
     }
   };
 
-  const isDisabled = submitting || !identifier || !code;
+  const isDisabled = submitting || !identifier.trim() || !(loginMode === "password" ? password : code);
 
   return (
     <div className={styles.page}>
@@ -84,11 +88,18 @@ const LoginPage = () => {
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
-          {/* 只保留手机号 + 验证码登录，不提供选择 */}
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="loginMode">登录方式</label>
+            <select id="loginMode" className={styles.input} value={loginMode}
+              onChange={event => { setLoginMode(event.target.value as "password" | "code"); setError(null); }}>
+              <option value="password">邮箱 / 手机号 + 密码</option>
+              <option value="code">手机号 + 验证码</option>
+            </select>
+          </div>
 
           <div className={styles.field}>
             <label className={styles.label} htmlFor="identifier">
-              手机号
+              {loginMode === "password" ? "邮箱或手机号" : "手机号"}
             </label>
             <input
               id="identifier"
@@ -96,11 +107,15 @@ const LoginPage = () => {
               value={identifier}
               onChange={event => setIdentifier(event.target.value)}
               placeholder="请输入账号"
-              type="tel"
-              autoComplete="tel"
+              type={loginMode === "password" ? "text" : "tel"}
+              autoComplete="username"
             />
           </div>
-          <div className={styles.field}>
+          {loginMode === "password" ? <div className={styles.field}>
+            <label className={styles.label} htmlFor="password">密码</label>
+            <input id="password" className={styles.input} type="password" autoComplete="current-password"
+              placeholder="请输入密码" value={password} onChange={event => setPassword(event.target.value)} />
+          </div> : <div className={styles.field}>
             <label className={styles.label} htmlFor="code">
               验证码
             </label>
@@ -123,7 +138,7 @@ const LoginPage = () => {
               </button>
             </div>
             <span className={styles.tips}>验证码用于校验登录，不需要输入密码。</span>
-          </div>
+          </div>}
 
           {error ? <div className={styles.error}>{error}</div> : null}
 
