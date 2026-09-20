@@ -21,6 +21,11 @@ canal:
   username: ${CANAL_USERNAME:canal}
   password: ${CANAL_PASSWORD:local-dev-password}
 
+search:
+  index-analyzer: standard
+  query-analyzer: standard
+  fetch-content: ${SEARCH_FETCH_CONTENT:false}
+
 management:
   endpoints:
     web:

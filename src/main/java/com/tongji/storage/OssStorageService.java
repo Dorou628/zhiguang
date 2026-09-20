@@ -87,7 +87,10 @@ public class OssStorageService {
     }
 
     private void ensureConfigured() {
-        if (props.getEndpoint() == null || props.getAccessKeyId() == null || props.getAccessKeySecret() == null || props.getBucket() == null) {
+        if (!org.springframework.util.StringUtils.hasText(props.getEndpoint())
+                || !org.springframework.util.StringUtils.hasText(props.getAccessKeyId())
+                || !org.springframework.util.StringUtils.hasText(props.getAccessKeySecret())
+                || !org.springframework.util.StringUtils.hasText(props.getBucket())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "对象存储未配置");
         }
     }

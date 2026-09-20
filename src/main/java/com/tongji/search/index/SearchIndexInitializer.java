@@ -11,16 +11,21 @@ import co.elastic.clients.elasticsearch._types.mapping.TextProperty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
  * 搜索索引初始化：应用启动时确保索引与 Mapping 存在。
- * 注意：title/body 使用 IK 分词器，需在 ES 集群安装 analysis-ik 插件。
+ * 默认使用 IK 分词器；本地 Docker 配置使用 ES 内置 standard 分词器。
  */
 @Service
 @RequiredArgsConstructor
 public class SearchIndexInitializer {
     private final ElasticsearchClient es;
     private static final String INDEX = "zhiguang_content_index";
+    @Value("${search.index-analyzer:ik_max_word}")
+    private String indexAnalyzer;
+    @Value("${search.query-analyzer:ik_smart}")
+    private String queryAnalyzer;
 
     @PostConstruct
     public void ensureIndex() {
@@ -33,10 +38,9 @@ public class SearchIndexInitializer {
             es.indices().create(c -> c.index(INDEX).mappings(m -> m
                     .properties("content_id", Property.of(p -> p.long_(LongNumberProperty.of(b -> b))))
                     .properties("content_type", Property.of(p -> p.keyword(KeywordProperty.of(b -> b))))
-                    .properties("description", Property.of(p -> p.text(TextProperty.of(b -> b.analyzer("ik_max_word")))))
-                    // IK 分词：title 使用 ik_max_word，检索使用 ik_smart；body 使用 ik_max_word
-                    .properties("title", Property.of(p -> p.text(TextProperty.of(b -> b.analyzer("ik_max_word").searchAnalyzer("ik_smart")))))
-                    .properties("body", Property.of(p -> p.text(TextProperty.of(b -> b.analyzer("ik_max_word")))))
+                    .properties("description", Property.of(p -> p.text(TextProperty.of(b -> b.analyzer(indexAnalyzer)))))
+                    .properties("title", Property.of(p -> p.text(TextProperty.of(b -> b.analyzer(indexAnalyzer).searchAnalyzer(queryAnalyzer)))))
+                    .properties("body", Property.of(p -> p.text(TextProperty.of(b -> b.analyzer(indexAnalyzer)))))
                     .properties("tags", Property.of(p -> p.keyword(KeywordProperty.of(b -> b))))
                     .properties("author_id", Property.of(p -> p.long_(LongNumberProperty.of(b -> b))))
                     .properties("author_avatar", Property.of(p -> p.keyword(KeywordProperty.of(b -> b))))

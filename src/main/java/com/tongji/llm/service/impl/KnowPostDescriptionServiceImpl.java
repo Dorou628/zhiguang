@@ -15,11 +15,13 @@ import java.text.Normalizer;
 public class KnowPostDescriptionServiceImpl implements KnowPostDescriptionService {
 
     private final ChatClient chatClient;
+    private final com.tongji.llm.ModelAvailability modelAvailability;
 
     /**
      * 基于正文生成不超过 50 字的中文描述。
      */
     public String generateDescription(String content) {
+        modelAvailability.requireChat();
         if (content == null || content.trim().isEmpty()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "正文内容不能为空");
         }

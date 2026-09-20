@@ -20,6 +20,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.DependsOn;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +39,7 @@ import com.tongji.knowpost.model.KnowPostFeedRow;
  */
 @Service
 @RequiredArgsConstructor
+@DependsOn("searchIndexInitializer")
 public class SearchIndexService {
     private static final Logger log = LoggerFactory.getLogger(SearchIndexService.class);
     private static final String INDEX = "zhiguang_content_index";
@@ -44,7 +48,16 @@ public class SearchIndexService {
     private final KnowPostMapper knowPostMapper;
     private final CounterService counterService;
     private final ObjectMapper objectMapper;
-    private final RestTemplate http = new RestTemplate();
+    private final RestTemplate http = contentClient();
+    @Value("${search.fetch-content:true}")
+    private boolean fetchContent;
+
+    private static RestTemplate contentClient() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3000);
+        factory.setReadTimeout(5000);
+        return new RestTemplate(factory);
+    }
 
     /**
      * 启动时若索引为空，进行历史数据回灌（分页）。
@@ -158,7 +171,7 @@ public class SearchIndexService {
      * 安全拉取正文内容：失败返回 null，不中断索引流程。
      */
     private String fetchContentSafe(String url) {
-        if (url == null || url.isBlank()) {
+        if (!fetchContent || url == null || url.isBlank()) {
             return null;
         }
 

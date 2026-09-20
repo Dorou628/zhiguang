@@ -24,6 +24,7 @@ public class RagQueryService {
     private final VectorStore vectorStore;
     // 大模型对话客户端（在 LlmConfig 中通过 @Qualifier 绑定 deepSeekChatModel）
     private final ChatClient chatClient;
+    private final com.tongji.llm.ModelAvailability modelAvailability;
     // 索引服务：确保帖子在问答前已建立/更新索引
     private final RagIndexService indexService;
 
@@ -31,6 +32,7 @@ public class RagQueryService {
      * 使用 WebFlux 返回回答内容的流。
      */
     public Flux<String> streamAnswerFlux(long postId, String question, int topK, int maxTokens) {
+        modelAvailability.requireRag();
         // 轻量保障：如索引不存在或指纹未变更则跳过，否则重建
         indexService.ensureIndexed(postId);
 

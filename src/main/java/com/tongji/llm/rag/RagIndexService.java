@@ -29,6 +29,7 @@ public class RagIndexService {
     private static final Logger log = LoggerFactory.getLogger(RagIndexService.class);
     // 向量库封装（Elasticsearch VectorStore），负责写入/检索向量
     private final VectorStore vectorStore;
+    private final com.tongji.llm.ModelAvailability modelAvailability;
     // 数据访问：根据 postId 查询知文详情（含 contentUrl、指纹等）
     private final KnowPostMapper knowPostMapper;
     // 拉取 Markdown 正文内容
@@ -44,6 +45,10 @@ public class RagIndexService {
     }
 
     public int reindexSinglePost(long postId) {
+        if (!modelAvailability.embeddingsConfigured()) {
+            log.info("Embedding provider not configured; index deferred for post {}", postId);
+            return 0;
+        }
         KnowPostDetailRow row = knowPostMapper.findDetailById(postId);
         if (row == null) {
             log.warn("Post {} not found", postId);
